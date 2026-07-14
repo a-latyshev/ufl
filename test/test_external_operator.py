@@ -573,3 +573,57 @@ def test_extraction_external_operator_composition(V1, V2, V3, V4, V5):
     assert e4.ufl_function_space() == V5.dual()
 
     assert set(args) == {arg2, arg3, arg4, arg5, Argument(V1, 0)}
+
+
+def test_spatial_derivatives(V1):
+    from ufl import grad, derivative, TrialFunction, ZeroBaseForm
+
+    # --- Scalar ExternalOperator ---
+    u = Coefficient(V1, count=0)
+    N = ExternalOperator(u, function_space=V1)
+
+    # grad(N) should have shape (2,)
+    grad_N = grad(N)
+    assert grad_N.ufl_shape == (2,)
+
+    v = TestFunction(V1)
+    F = inner(grad_N, grad(v)) * dx
+
+    # Differentiate F with respect to u
+    u_hat = TrialFunction(V1)
+    dFdu = expand_derivatives(derivative(F, u, u_hat))
+
+    # Currently, UFL fails to propagate the derivative through the spatial gradient
+    # and returns an empty form. We assert that it is not empty to catch this limitation.
+    assert not isinstance(dFdu, ZeroBaseForm)
+    assert len(dFdu.integrals()) > 0
+
+
+def test_spatial_derivatives_vector(V1):
+    from utils import FiniteElement
+    from ufl import grad, derivative, FunctionSpace, identity_pullback, TrialFunction, ZeroBaseForm
+    from ufl.sobolevspace import H1
+
+    # Create a vector function space
+    element_vec = FiniteElement("CG", triangle, 1, (2,), identity_pullback, H1)
+    V_vec = FunctionSpace(V1.ufl_domain(), element_vec)
+
+    u = Coefficient(V_vec, count=0)
+    N = ExternalOperator(u, function_space=V_vec)
+
+    # grad(N) should have shape (2, 2)
+    grad_N = grad(N)
+    assert grad_N.ufl_shape == (2, 2)
+
+    v = TestFunction(V_vec)
+    F = inner(grad_N, grad(v)) * dx
+
+    # Differentiate F with respect to u
+    u_hat = TrialFunction(V_vec)
+    dFdu = expand_derivatives(derivative(F, u, u_hat))
+
+    # Currently, UFL fails to propagate the derivative through the spatial gradient
+    # and returns an empty form. We assert that it is not empty to catch this limitation.
+    assert not isinstance(dFdu, ZeroBaseForm)
+    assert len(dFdu.integrals()) > 0
+
