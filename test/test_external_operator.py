@@ -576,7 +576,9 @@ def test_extraction_external_operator_composition(V1, V2, V3, V4, V5):
 
 
 def test_spatial_derivatives(V1):
-    from ufl import grad, derivative, TrialFunction, ZeroBaseForm
+    from ufl import grad, derivative, TrialFunction, Argument, Action
+    from ufl.algorithms.apply_algebra_lowering import apply_algebra_lowering
+    from ufl.algorithms.renumbering import renumber_indices
 
     # --- Scalar ExternalOperator ---
     u = Coefficient(V1, count=0)
@@ -593,15 +595,20 @@ def test_spatial_derivatives(V1):
     u_hat = TrialFunction(V1)
     dFdu = expand_derivatives(derivative(F, u, u_hat))
 
-    # Currently, UFL fails to propagate the derivative through the spatial gradient
-    # and returns an empty form. We assert that it is not empty to catch this limitation.
-    assert not isinstance(dFdu, ZeroBaseForm)
-    assert len(dFdu.integrals()) > 0
+    # Expected derivative: Action(dFdN_partial, dNdu)
+    w = Argument(V1, number=1)
+    dFdN_partial = inner(grad(w), grad(v)) * dx
+    dNdu = N._ufl_expr_reconstruct_(u, derivatives=(1,), argument_slots=(N.arguments()[0], u_hat))
+    expected_dFdu = apply_algebra_lowering(Action(dFdN_partial, dNdu))
+
+    assert renumber_indices(dFdu) == renumber_indices(expected_dFdu)
 
 
 def test_spatial_derivatives_vector(V1):
     from utils import FiniteElement
-    from ufl import grad, derivative, FunctionSpace, identity_pullback, TrialFunction, ZeroBaseForm
+    from ufl import grad, derivative, FunctionSpace, identity_pullback, TrialFunction, Argument, Action
+    from ufl.algorithms.apply_algebra_lowering import apply_algebra_lowering
+    from ufl.algorithms.renumbering import renumber_indices
     from ufl.sobolevspace import H1
 
     # Create a vector function space
@@ -622,8 +629,12 @@ def test_spatial_derivatives_vector(V1):
     u_hat = TrialFunction(V_vec)
     dFdu = expand_derivatives(derivative(F, u, u_hat))
 
-    # Currently, UFL fails to propagate the derivative through the spatial gradient
-    # and returns an empty form. We assert that it is not empty to catch this limitation.
-    assert not isinstance(dFdu, ZeroBaseForm)
-    assert len(dFdu.integrals()) > 0
+    # Expected derivative: Action(dFdN_partial, dNdu)
+    w = Argument(V_vec, number=1)
+    dFdN_partial = inner(grad(w), grad(v)) * dx
+    dNdu = N._ufl_expr_reconstruct_(u, derivatives=(1,), argument_slots=(N.arguments()[0], u_hat))
+    expected_dFdu = apply_algebra_lowering(Action(dFdN_partial, dNdu))
+
+    assert renumber_indices(dFdu) == renumber_indices(expected_dFdu)
+
 

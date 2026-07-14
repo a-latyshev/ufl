@@ -1593,6 +1593,8 @@ class GateauxDerivativeRuleset(GenericDerivativeRuleset):
                     else:
                         gprimesum += prod
 
+        if isinstance(o, BaseFormOperator):
+            self.pending_operations += (o,)
         return gprimesum
 
     @process.register(CoordinateDerivative)
